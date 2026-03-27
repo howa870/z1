@@ -1,0 +1,32 @@
+modules = ["nodejs-24"]
+
+[[artifacts]]
+id = "artifacts/api-server"
+
+[[artifacts]]
+id = "artifacts/mockup-sandbox"
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://olyumpjjfykifjlzbcdv.supabase.co"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9seXVtcGpqZnlraWZqbHpiY2R2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1ODE2ODIsImV4cCI6MjA5MDE1NzY4Mn0.zgRKbibsz8X1ENj8IFk5MXblnbVhXpZyV-eGfLuj8NM"
