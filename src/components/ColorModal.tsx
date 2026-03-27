@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save, Upload } from "lucide-react";
+import { X, Save, Upload, Loader2 } from "lucide-react";
 import { type CatalogColor } from "../lib/catalogsDb";
+import { uploadImage } from "../lib/storage";
 
 interface Props {
   open: boolean;
@@ -17,24 +18,40 @@ const EMPTY = { name: "", code: "", image: "" };
 
 export function ColorModal({ open, onClose, initial, onSave, saving, colorCount }: Props) {
   const [form, setForm] = useState(EMPTY);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const isNew = !initial?.id;
   const limitReached = isNew && colorCount >= MAX_COLORS;
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? { name: initial.name ?? "", code: initial.code ?? "", image: initial.image ?? "" } : EMPTY);
+      setForm(initial
+        ? { name: initial.name ?? "", code: initial.code ?? "", image: initial.image ?? "" }
+        : EMPTY
+      );
+      setUploadMsg(null);
     }
   }, [open, initial]);
 
   const set = (k: keyof typeof EMPTY, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => set("image", reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = "";
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const url = await uploadImage(file);
+      set("image", url);
+      setUploadMsg({ type: "success", text: "تم رفع الصورة ✓" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطأ غير معروف";
+      console.error("[ColorModal] فشل رفع الصورة:", msg);
+      setUploadMsg({ type: "error", text: `فشل الرفع: ${msg}` });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -77,15 +94,29 @@ export function ColorModal({ open, onClose, initial, onSave, saving, colorCount 
                         ? <img src={form.image} alt="" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-gray-700 text-2xl">🎨</div>
                       }
-                      <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <Upload className="w-5 h-5 text-[#d4af37]" />
-                        <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+                      <label className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity cursor-pointer ${uploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                        {uploading
+                          ? <Loader2 className="w-5 h-5 text-[#d4af37] animate-spin" />
+                          : <Upload className="w-5 h-5 text-[#d4af37]" />
+                        }
+                        <input type="file" accept="image/*" onChange={handleFile} className="hidden" disabled={uploading} />
                       </label>
                     </div>
+
+                    {uploadMsg && (
+                      <p className={`text-xs mt-1.5 text-center ${uploadMsg.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                        {uploadMsg.text}
+                      </p>
+                    )}
+
                     <div className="mt-2">
-                      <input value={form.image.startsWith("data:") ? "" : form.image}
+                      <input
+                        value={form.image.startsWith("http") ? form.image : ""}
                         onChange={e => set("image", e.target.value)}
-                        className={inp} placeholder="رابط الصورة..." dir="ltr" />
+                        className={inp}
+                        placeholder="رابط الصورة..."
+                        dir="ltr"
+                      />
                     </div>
                   </div>
 
@@ -98,7 +129,9 @@ export function ColorModal({ open, onClose, initial, onSave, saving, colorCount 
                     <input value={form.code} onChange={e => set("code", e.target.value)} className={inp} placeholder="مثال: BG-01" dir="ltr" />
                   </div>
 
-                  <motion.button onClick={() => onSave(form)} disabled={saving || !form.name.trim() || !form.code.trim()}
+                  <motion.button
+                    onClick={() => onSave(form)}
+                    disabled={saving || uploading || !form.name.trim() || !form.code.trim()}
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     className="w-full flex items-center justify-center gap-2 bg-[#d4af37] hover:bg-[#c9a02e] disabled:opacity-50 disabled:cursor-not-allowed text-black py-3 rounded-xl font-black transition-all">
                     <Save className="w-4 h-4" />

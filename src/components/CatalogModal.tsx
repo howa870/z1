@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save, Upload } from "lucide-react";
+import { X, Save, Upload, Loader2 } from "lucide-react";
 import { type Catalog } from "../lib/catalogsDb";
+import { uploadImage } from "../lib/storage";
 
 interface Props {
   open: boolean;
@@ -21,23 +22,39 @@ const EMPTY: Omit<Catalog, "id" | "created_at"> = {
 
 export function CatalogModal({ open, onClose, initial, onSave, saving, totalCatalogs }: Props) {
   const [form, setForm] = useState<Omit<Catalog, "id" | "created_at">>(EMPTY);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const isNew = !initial?.id;
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? { name: initial.name ?? "", fabric_type: initial.fabric_type ?? "", warranty: initial.warranty ?? "", image: initial.image ?? "" } : EMPTY);
+      setForm(initial
+        ? { name: initial.name ?? "", fabric_type: initial.fabric_type ?? "", warranty: initial.warranty ?? "", image: initial.image ?? "" }
+        : EMPTY
+      );
+      setUploadMsg(null);
     }
   }, [open, initial]);
 
   const set = (k: keyof typeof EMPTY, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => set("image", reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = "";
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const url = await uploadImage(file);
+      set("image", url);
+      setUploadMsg({ type: "success", text: "تم رفع الصورة بنجاح ✓" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطأ غير معروف";
+      console.error("[CatalogModal] فشل رفع الصورة:", msg);
+      setUploadMsg({ type: "error", text: `فشل الرفع: ${msg}` });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -78,18 +95,32 @@ export function CatalogModal({ open, onClose, initial, onSave, saving, totalCata
                     ? <img src={form.image} alt="" className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center text-gray-700 text-sm">لا توجد صورة</div>
                   }
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <label className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity cursor-pointer ${uploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                     <div className="flex flex-col items-center gap-1 text-[#d4af37]">
-                      <Upload className="w-6 h-6" />
-                      <span className="text-xs font-bold">رفع صورة</span>
+                      {uploading
+                        ? <><Loader2 className="w-6 h-6 animate-spin" /><span className="text-xs font-bold">جاري الرفع...</span></>
+                        : <><Upload className="w-6 h-6" /><span className="text-xs font-bold">رفع صورة</span></>
+                      }
                     </div>
-                    <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+                    <input type="file" accept="image/*" onChange={handleFile} className="hidden" disabled={uploading} />
                   </label>
                 </div>
+
+                {/* Upload status */}
+                {uploadMsg && (
+                  <p className={`text-xs mt-1.5 ${uploadMsg.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                    {uploadMsg.text}
+                  </p>
+                )}
+
                 <div className="mt-2">
-                  <input value={form.image.startsWith("data:") ? "" : form.image}
+                  <input
+                    value={form.image.startsWith("http") ? form.image : ""}
                     onChange={e => set("image", e.target.value)}
-                    className={inp} placeholder="أو أدخل رابط الصورة..." dir="ltr" />
+                    className={inp}
+                    placeholder="أو أدخل رابط الصورة..."
+                    dir="ltr"
+                  />
                 </div>
               </div>
 
@@ -103,7 +134,10 @@ export function CatalogModal({ open, onClose, initial, onSave, saving, totalCata
                 <input value={form.warranty} onChange={e => set("warranty", e.target.value)} className={inp} placeholder="مثال: ضمان سنة" />
               </Field>
 
-              <motion.button onClick={handleSubmit} disabled={saving || !form.name.trim()} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              <motion.button
+                onClick={handleSubmit}
+                disabled={saving || uploading || !form.name.trim()}
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 className="w-full flex items-center justify-center gap-2 bg-[#d4af37] hover:bg-[#c9a02e] disabled:opacity-50 disabled:cursor-not-allowed text-black py-3 rounded-xl font-black text-base transition-all mt-2">
                 <Save className="w-4 h-4" />
                 {saving ? "جاري الحفظ..." : (isNew ? "إضافة الكتلوك" : "حفظ التعديلات")}

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Settings, Image, MessageSquare, Share2, Save, Trash2, Upload, Plus, Phone, Database } from "lucide-react";
+import { X, Settings, Image, MessageSquare, Share2, Save, Trash2, Upload, Plus, Phone, Database, Loader2 } from "lucide-react";
 import { addGalleryItem, deleteGalleryItem, addTestimonial, deleteTestimonial, isSupabaseConfigured, type GalleryItem, type Testimonial, type SiteSettings } from "../lib/db";
+import { uploadImage } from "../lib/storage";
 
 interface Props {
   open: boolean;
@@ -33,20 +34,24 @@ export function AdminPanel({ open, onClose, settings, onSettingsChange, galleryI
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
     setUploadLoading(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
+    try {
       const isVideo = file.type.startsWith("video/");
+      const url = await uploadImage(file);
       const item = await addGalleryItem({
-        url: reader.result as string,
+        url,
         type: isVideo ? "video" : "image",
         title: file.name.replace(/\.[^.]+$/, ""),
       });
       if (item) onGalleryChange([...galleryItems, item]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطأ غير معروف";
+      console.error("[AdminPanel] فشل رفع الملف:", msg);
+      alert(`فشل رفع الصورة: ${msg}`);
+    } finally {
       setUploadLoading(false);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    }
   };
 
   const handleAddFromUrl = async () => {
@@ -165,10 +170,13 @@ export function AdminPanel({ open, onClose, settings, onSettingsChange, galleryI
               {tab === "gallery" && (
                 <>
                   <Section title="رفع من الجهاز">
-                    <label className={`flex items-center justify-center gap-3 cursor-pointer border-2 border-dashed border-[#d4af37]/30 hover:border-[#d4af37] rounded-xl p-7 transition-all ${uploadLoading ? "opacity-50 pointer-events-none" : ""}`}>
-                      <Upload className="w-6 h-6 text-[#d4af37]" />
+                    <label className={`flex items-center justify-center gap-3 cursor-pointer border-2 border-dashed border-[#d4af37]/30 hover:border-[#d4af37] rounded-xl p-7 transition-all ${uploadLoading ? "opacity-60 pointer-events-none" : ""}`}>
+                      {uploadLoading
+                        ? <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
+                        : <Upload className="w-6 h-6 text-[#d4af37]" />
+                      }
                       <span className="text-gray-300 font-medium">{uploadLoading ? "جاري الرفع..." : "اختر صورة أو فيديو"}</span>
-                      <input type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
+                      <input type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" disabled={uploadLoading} />
                     </label>
                   </Section>
 
