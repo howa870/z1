@@ -154,3 +154,11 @@ html { scroll-behavior: smooth; }
 .luxury-gradient {
   background: linear-gradient(135deg, #0a0a0a 0%, #1a1410 50%, #0a0a0a 100%);
 }
+
+.font-cairo {
+  font-family: 'Cairo', 'Tajawal', sans-serif;
+}
+
+* {
+  font-family: 'Cairo', 'Tajawal', sans-serif;
+}

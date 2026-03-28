@@ -1,38 +1,79 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Switch, Route } from "wouter";
+import { Suspense, lazy } from "react";
+import { Loader2 } from "lucide-react";
+import { AuthProvider } from "./hooks/useAuth";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { Layout } from "./components/Layout";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
-import Gallery from "@/pages/Gallery";
-import Colors from "@/pages/Colors";
-import Catalogs from "@/pages/Catalogs";
 
-const queryClient = new QueryClient();
+const Login = lazy(() => import("./pages/Login"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Products = lazy(() => import("./pages/Products"));
+const AddProduct = lazy(() => import("./pages/AddProduct"));
 
-function Router() {
+function PageLoader() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/gallery" component={Gallery} />
-      <Route path="/colors" component={Colors} />
-      <Route path="/catalogs" component={Catalogs} />
-      <Route component={NotFound} />
-    </Switch>
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
+    </div>
   );
 }
 
-function App() {
+function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ProtectedRoute>
+      <Layout>{children}</Layout>
+    </ProtectedRoute>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          <Route path="/login" component={Login} />
+
+          <Route path="/">
+            <AdminLayout>
+              <Dashboard />
+            </AdminLayout>
+          </Route>
+
+          <Route path="/products">
+            <AdminLayout>
+              <Products />
+            </AdminLayout>
+          </Route>
+
+          <Route path="/products/add">
+            <AdminLayout>
+              <AddProduct />
+            </AdminLayout>
+          </Route>
+
+          <Route path="/products/edit/:id">
+            {() => (
+              <AdminLayout>
+                <AddProduct />
+              </AdminLayout>
+            )}
+          </Route>
+
+          <Route>
+            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center font-cairo" dir="rtl">
+              <div className="text-center">
+                <p className="text-[#d4af37] text-6xl font-black mb-4">404</p>
+                <p className="text-gray-400 mb-6">الصفحة غير موجودة</p>
+                <a href="/" className="bg-[#d4af37] text-black px-5 py-2.5 rounded-xl font-black text-sm">
+                  الرئيسية
+                </a>
+              </div>
+            </div>
+          </Route>
+        </Switch>
+      </Suspense>
+      <Toaster />
+    </AuthProvider>
+  );
+}

@@ -1,62 +1,73 @@
-# قنفات ودواوين الأسدي — Standalone Vite App
+# لوحة إدارة منتجات الأسدي — Admin Dashboard
 
 ## Overview
 
-Standalone React + Vite application ready for Vercel deployment. No monorepo/workspace — clean single-project structure.
+Arabic RTL admin dashboard for managing products. Built with React + Vite + TypeScript + Tailwind + Supabase. No backend/API server — Supabase handles everything.
 
 ## Stack
 
-- **Framework**: React 19 + Vite 7
+- **Framework**: React 19 + Vite 7 (lazy loading / code splitting)
+- **Language**: TypeScript (strict)
 - **Styling**: Tailwind CSS v4 + Framer Motion
 - **Routing**: Wouter
-- **Database**: Supabase (`@supabase/supabase-js`)
-- **UI Components**: Radix UI + shadcn/ui
+- **Auth**: Supabase Auth (email + password)
+- **Database**: Supabase PostgreSQL
+- **Storage**: Supabase Storage (bucket: `images`)
+- **UI Components**: shadcn/ui (Radix UI)
 - **Package Manager**: npm
-- **Language**: TypeScript
 
-## Structure
+## Project Structure
 
 ```text
-/
-├── src/
-│   ├── App.tsx              # Router (wouter)
-│   ├── main.tsx             # Entry point
-│   ├── index.css            # Global styles + Tailwind
-│   ├── pages/
-│   │   ├── Home.tsx         # Main landing page
-│   │   ├── Gallery.tsx      # Full gallery with lightbox
-│   │   ├── Colors.tsx       # Color swatches
-│   │   └── Catalogs.tsx     # Fabric catalog management
-│   ├── components/
-│   │   ├── AdminLogin.tsx   # Secret admin login modal
-│   │   ├── AdminPanel.tsx   # Admin control panel
-│   │   ├── CatalogModal.tsx # Add/edit catalog modal
-│   │   ├── ColorModal.tsx   # Add/edit color modal
-│   │   ├── LoadingSpinner.tsx
-│   │   └── ScrollToTop.tsx
-│   └── lib/
-│       ├── supabase.ts      # Supabase client
-│       ├── db.ts            # Gallery, testimonials, settings CRUD
-│       └── catalogsDb.ts   # Catalogs & colors CRUD
-├── public/                  # Static assets
-├── dist/                    # Production build output
-├── index.html               # HTML entry
-├── vite.config.ts           # Vite config (PORT env var, no Replit deps)
-├── tsconfig.json            # Standalone TypeScript config
-├── package.json             # npm package (no workspace)
-├── vercel.json              # SPA routing for Vercel
-├── .env                     # Supabase env vars (local)
-├── .env.example             # Template for env vars
-└── supabase-tables.sql      # SQL to create Supabase tables
+src/
+├── services/
+│   └── products.ts          # CRUD for products table
+├── hooks/
+│   ├── useAuth.tsx           # Auth context + hook (Supabase Auth)
+│   └── useProducts.ts        # Products state hook
+├── components/
+│   ├── Layout.tsx            # Sidebar + mobile header
+│   ├── ProtectedRoute.tsx    # Auth guard (redirects to /login)
+│   └── ImageUpload.tsx       # Drag & drop image uploader → Supabase Storage
+├── pages/
+│   ├── Login.tsx             # Email + password login
+│   ├── Dashboard.tsx         # Stats overview + recent products
+│   ├── Products.tsx          # Products grid with search + delete
+│   └── AddProduct.tsx        # Add/edit product form
+├── lib/
+│   ├── supabase.ts           # Supabase client (VITE_SUPABASE_*)
+│   └── storage.ts            # uploadImage() → Supabase Storage
+└── App.tsx                   # Router (lazy-loaded routes)
 ```
 
-## Scripts
+## Routes
 
-```bash
-npm run dev      # Start dev server (PORT env var or 3000)
-npm run build    # Production build → dist/
-npm run preview  # Preview production build
+| Path | Description | Protected |
+|------|-------------|-----------|
+| `/login` | Login page | No |
+| `/` | Dashboard overview | Yes |
+| `/products` | Products list | Yes |
+| `/products/add` | Add product | Yes |
+| `/products/edit/:id` | Edit product | Yes |
+
+## Supabase Setup
+
+Run `supabase-schema.sql` in Supabase SQL editor:
+
+```sql
+CREATE TABLE products (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  price NUMERIC(12,2) DEFAULT 0,
+  image TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+-- + policies (see supabase-schema.sql)
 ```
+
+Storage: create `images` bucket with public access.
 
 ## Environment Variables
 
@@ -65,27 +76,25 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-## Supabase Tables
+## Scripts
 
-Run `supabase-tables.sql` in Supabase SQL editor to create:
-- `gallery` — images/videos for gallery page
-- `testimonials` — customer reviews
-- `settings` — site settings (title, phone, social links)
-- `catalogs` — fabric catalogs (max 24)
-- `catalog_colors` — colors per catalog (max 20 each)
-
-## Admin Panel
-
-- **Trigger**: Click copyright text 5× OR press Ctrl+Shift+A
-- **Login**: username `admin` / password `alasdi2024`
-- **Features**: gallery management, testimonials, social links, contact info
+```bash
+npm run dev      # Dev server (--host, port 5173)
+npm run build    # Production build → dist/
+npm run preview  # Preview production build
+```
 
 ## Deployment (Vercel)
 
 1. Push to GitHub
-2. Import repo in Vercel
-3. Framework: Vite (auto-detected)
-4. Build command: `npm run build`
-5. Output dir: `dist`
-6. Add env vars: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-7. Deploy — `vercel.json` handles SPA routing automatically
+2. Import in Vercel — Vite auto-detected
+3. Add env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+4. Deploy — `vercel.json` handles SPA routing
+
+## Build Output (code-split)
+
+- `Login.js` — 5 kB
+- `Dashboard.js` — 4 kB
+- `Products.js` — 6 kB
+- `AddProduct.js` — 10 kB
+- `index.js` (shared) — 583 kB
